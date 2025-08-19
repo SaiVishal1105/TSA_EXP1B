@@ -19,63 +19,87 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 # Load dataset
 data = pd.read_csv("/content/car_price_prediction.csv")
 
-data = data.sort_values(by='Prod. year') 
+# Use production year as time index
+data['Prod. year'] = pd.to_datetime(data['Prod. year'], format='%Y')
+data = data.groupby('Prod. year')['Price'].mean().reset_index()  # average price per year
 data.set_index('Prod. year', inplace=True)
-data["Engine volume"] = data["Engine volume"].str.replace(r'[^0-9.]', '', regex=True).astype(float)
-# --- 1. Log Transformation ---
-data['log_engine_volume'] = np.log(data['Engine volume'])
 
-# --- 2. Regular Differencing ---
-data['diff_engine_volume'] = data['Engine volume'].diff()
+# Regular Differencing
+data['price_diff'] = data['Price'] - data['Price'].shift(1)
 
-# --- 3. Seasonal Adjustment ---
-# Assuming yearly data with seasonality period of 12 (adjust if monthly/quarterly etc.)
-decomposition = seasonal_decompose(data['Engine volume'], model='additive', period=12)
+# Seasonal Adjustment (assuming yearly seasonality)
+result = seasonal_decompose(data['Price'], model='additive', period=1)
+data['price_seasonal_diff'] = result.resid
 
-data['seasonal'] = decomposition.seasonal
-data['trend'] = decomposition.trend
-data['residual'] = decomposition.resid
-data['seasonally_adjusted'] = data['Engine volume'] - data['seasonal']
+# Log Transformation
+data['price_log'] = np.log(data['Price'])
+data['price_log_diff'] = data['price_log'] - data['price_log'].shift(1)
 
-# --- Plot results ---
-plt.figure(figsize=(12,10))
+# Seasonal Adjustment on log-differenced data
+result_log = seasonal_decompose(data['price_log_diff'].dropna(), model='additive', period=1)
+data['price_log_seasonal_diff'] = result_log.resid
 
-plt.subplot(511)
-plt.plot(data['Engine volume'], label='Original')
-plt.legend()
+# Plotting
+plt.figure(figsize=(16, 16))
 
-plt.subplot(512)
-plt.plot(data['diff_engine_volume'], label='Differenced')
-plt.legend()
+plt.subplot(6, 1, 1)
+plt.plot(data['Price'], label='Original')
+plt.legend(loc='best')
+plt.title('Original Data (Avg Price per Year)')
 
-plt.subplot(513)
-plt.plot(data['log_engine_volume'], label='Log Transformed')
-plt.legend()
+plt.subplot(6, 1, 2)
+plt.plot(data['price_diff'], label='Regular Differencing')
+plt.legend(loc='best')
+plt.title('Regular Differencing')
 
-plt.subplot(514)
-plt.plot(data['seasonal'], label='Seasonal Component')
-plt.legend()
+plt.subplot(6, 1, 3)
+plt.plot(data['price_seasonal_diff'], label='Seasonal Adjustment')
+plt.legend(loc='best')
+plt.title('Seasonal Adjustment')
 
-plt.subplot(515)
-plt.plot(data['seasonally_adjusted'], label='Seasonally Adjusted')
-plt.legend()
+plt.subplot(6, 1, 4)
+plt.plot(data['price_log'], label='Log Transformation')
+plt.legend(loc='best')
+plt.title('Log Transformation')
+
+plt.subplot(6, 1, 5)
+plt.plot(data['price_log_diff'], label='Log Transformation + Differencing')
+plt.legend(loc='best')
+plt.title('Log Transformation + Regular Differencing')
+
+plt.subplot(6, 1, 6)
+plt.plot(data['price_log_seasonal_diff'], label='Log Transformation + Differencing + Seasonal Adjustment')
+plt.legend(loc='best')
+plt.title('Log Transformation + Regular Differencing + Seasonal Adjustment')
+
+plt.tight_layout()
 plt.show()
+
 
 ```
 
 ### OUTPUT:
 
 ORIGINAL:
-<img width="1254" height="205" alt="image" src="https://github.com/user-attachments/assets/6fd48d9e-042d-41a6-a767-37e5c5219cda" />
+<img width="1429" height="245" alt="image" src="https://github.com/user-attachments/assets/15a6fe8b-c68a-4a6a-8f45-a4c0d900abfa" />
+
 
 REGULAR DIFFERENCING:
-<img width="1276" height="211" alt="image" src="https://github.com/user-attachments/assets/a466a946-bf91-4ad6-9bbc-28ad9731e36d" />
+<img width="1432" height="229" alt="image" src="https://github.com/user-attachments/assets/2b5c78ed-4c42-4a93-8e15-106e8075119b" />
+
 
 SEASONAL ADJUSTMENT:
-<img width="1248" height="222" alt="image" src="https://github.com/user-attachments/assets/4f565c53-619a-4978-b928-93d23128962f" />
+<img width="1435" height="226" alt="image" src="https://github.com/user-attachments/assets/d17d7eb0-332b-4601-ad7f-b08a89a07c60" />
+
 
 LOG TRANSFORMATION:
-<img width="1243" height="198" alt="image" src="https://github.com/user-attachments/assets/874e5121-41ee-470c-9af9-8ab25b923b2d" />
+<img width="1430" height="231" alt="image" src="https://github.com/user-attachments/assets/c8a1d001-de2d-43ee-baba-349d5b8eabc8" />
+
+LOG TRANSFORMATION + REGULAR DIFFERENCING:
+<img width="1431" height="231" alt="image" src="https://github.com/user-attachments/assets/5552fb4f-6dff-492f-99c3-126967b056a7" />
+
+LOG TRANSFORMATION + REGULAR DIFFERENCING + SEASONAL ADJUSTMENT:
+<img width="1434" height="236" alt="image" src="https://github.com/user-attachments/assets/1f361618-eb13-4381-a2e7-5ad532247673" />
 
 
 ### RESULT:
